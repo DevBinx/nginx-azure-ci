@@ -1,19 +1,33 @@
-# Starter pipeline
-# Start with a minimal pipeline that you can customize to build and deploy your code.
-# Add steps that build, run tests, deploy, and more:
-# https://aka.ms/yaml
-
 trigger:
-- main
+  branches:
+    include:
+      - main
 
 pool:
-  vmImage: ubuntu-latest
+  vmImage: 'ubuntu-latest'
+
+variables:
+  nginx_path: '/etc/nginx/conf.d'
+  private_key: $(NGINX_PRIVATE_KEY) # 보안을 위해 변수 그룹에서 SSH 개인 키를 설정
 
 steps:
-- script: echo Hello, world!
-  displayName: 'Run a one-line script'
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '3.x'
+
+- task: InstallSSHKey@0
+  inputs:
+    knownHostsEntry: $(NGINX_SERVER_INFO)
+    sshPublicKey: $(NGINX_PUBLIC_KEY)
+    sshPassphrase: $(NGINX_SSH_PASSPHRASE)
+    
+- task: CopyFilesOverSSH@0
+  inputs:
+    sshEndpoint: $(NGINX_SERVER_INFO)
+    sourceFolder: '$(Build.SourcesDirectory)/nginx/conf.d'
+    targetFolder: '$(nginx_path)'
+    overwrite: true
 
 - script: |
-    echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
-  displayName: 'Run a multi-line script'
+    ssh -i $(private_key) $(NGINX_SERVER_INFO) 'sudo systemctl restart nginx'
+  displayName: 'Restart NGINX'
